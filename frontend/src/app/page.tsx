@@ -1,67 +1,27 @@
 import Image from "next/image";
 import styles from "./page.module.css";
 
-export default function Home() {
+export default async function Home() {
+  let backendMessage = "Connecting to backend...";
+  try {
+    const res = await fetch("http://127.0.0.1:8000/", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      backendMessage = data.message;
+    }
+  } catch (error) {
+    backendMessage = "Backend is currently offline. Start FastAPI to see the message!";
+  }
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <h1 style={{ fontSize: '3rem', fontFamily: 'serif', letterSpacing: '2px' }}>AI World Builder</h1>
+        <p style={{ fontSize: '1.2rem', color: '#aaa', marginBottom: '2rem' }}>Your infinite universe awaits.</p>
+        
+        <div style={{ padding: '20px', background: '#111', borderRadius: '8px', border: '1px solid #333' }}>
+          <h2 style={{ fontSize: '1rem', color: '#888', textTransform: 'uppercase', marginBottom: '10px' }}>Server Status</h2>
+          <p style={{ color: '#00ffcc', fontFamily: 'monospace', fontSize: '1.1rem' }}>{backendMessage}</p>
         </div>
       </main>
     </div>
