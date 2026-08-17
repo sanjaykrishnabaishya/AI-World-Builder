@@ -1,0 +1,19 @@
+# Mac/OSX
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+env/
+.pytest_cache/
+
+# Node (already in frontend/, but good to have)
+node_modules/
+dist/
