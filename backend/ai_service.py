@@ -65,21 +65,20 @@ def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str
 
 def generate_story_stream(lore: WorldLore):
     prompt = f"""
-    You are the Atlas Studio Master Weaver. 
-    Using simple English that a child can understand, write a massive, incredibly detailed story based on the following world lore.
-    Your goal is to write a very long story (aiming for over 6,000 words).
+    You are the Atlas Studio Master Weaver.
+    Your task is to write an incredibly detailed, massive story (aiming for well over 6,000 words) set in the following world.
     
-    World Lore:
+    WORLD CONTEXT:
     Name: {lore.world_name}
     History: {lore.core_history}
     Magic/Tech: {lore.magic_system}
     
-    Requirements:
-    1. SIMPLE ENGLISH: Use simple words, short sentences, and clear descriptions so a 5th grader can read it easily.
-    2. LENGTH: Write as much as you possibly can. Build deep character arcs, intense dialogue, and long descriptions of the locations. Do not summarize.
-    3. CHARACTERS: Invent multiple interesting characters.
+    CRITICAL INSTRUCTIONS:
+    1. SIMPLE ENGLISH: You must write in extremely simple English. Use basic vocabulary and short sentences so a child can understand it perfectly.
+    2. LENGTH: Do not summarize. Write expansive dialogue, deep descriptions of locations, and long character arcs.
+    3. START IMMEDIATELY: Do not output any meta-text, titles, or planning. Just begin the story right now.
     
-    Begin writing the story now:
+    Chapter 1
     """
     
     response = client.models.generate_content_stream(
