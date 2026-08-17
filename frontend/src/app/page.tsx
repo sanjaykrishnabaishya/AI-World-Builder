@@ -36,15 +36,28 @@ export default function Home() {
   const handleSendChat = async () => {
     if (!chatInput.trim()) return;
     
-    // Check if it's an image command (we'll implement this fully in Step 4)
+    // Image Generation Command
     if (chatInput.startsWith('/imagine ')) {
+       const prompt = chatInput.replace('/imagine ', '');
        addMessage({ role: 'user', content: chatInput });
        setChatInput('');
        setIsChatLoading(true);
-       setTimeout(() => {
-          addMessage({ role: 'model', content: "🎨 Image generation feature is coming in Step 4! For now, describe the visual details you want."});
-          setIsChatLoading(false);
-       }, 1000);
+       
+       try {
+         const response = await fetch('http://127.0.0.1:8000/api/generate/image', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ prompt: prompt })
+         });
+         
+         if (!response.ok) throw new Error("Image generation failed.");
+         const data = await response.json();
+         addMessage({ role: 'model', content: `Generated image for: "${prompt}"`, image_url: data.image_url });
+       } catch (err: any) {
+         addMessage({ role: 'model', content: "Error: " + err.message });
+       } finally {
+         setIsChatLoading(false);
+       }
        return;
     }
 
@@ -53,7 +66,6 @@ export default function Home() {
     setIsChatLoading(true);
 
     try {
-      // We will create this backend endpoint in Step 3
       const response = await fetch('http://127.0.0.1:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,6 +174,9 @@ export default function Home() {
              {chatHistory.map((msg, i) => (
                <div key={i} className={`chat-message ${msg.role}`}>
                   <p style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                  {msg.image_url && (
+                    <img src={msg.image_url} alt="Generated Art" style={{ marginTop: '1rem', width: '100%', borderRadius: '8px', border: '1px solid var(--border-subtle)' }} />
+                  )}
                </div>
              ))}
              {isChatLoading && (

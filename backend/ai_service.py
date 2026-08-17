@@ -1,8 +1,11 @@
 import os
+import requests
+import base64
 from typing import List, Dict, Any
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from models import WorldLore
 from models import WorldLore
 
 load_dotenv()
@@ -55,3 +58,19 @@ def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str
     )
     
     return response.text
+
+def generate_image_from_prompt(prompt: str) -> str:
+    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+    headers = {"Authorization": f"Bearer {os.getenv('HUGGINGFACE_API_KEY')}"}
+    
+    # We add a style prefix to ensure high quality results based on the Atlas Studio aesthetic
+    full_prompt = f"digital art, highly detailed, cinematic lighting, masterpiece, concept art, {prompt}"
+    
+    response = requests.post(API_URL, headers=headers, json={"inputs": full_prompt})
+    
+    if response.status_code != 200:
+        raise Exception(f"Hugging Face API Error: {response.text}")
+        
+    image_bytes = response.content
+    base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+    return f"data:image/jpeg;base64,{base64_encoded}"

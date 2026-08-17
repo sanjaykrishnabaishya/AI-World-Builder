@@ -24,6 +24,7 @@ export interface WorldLore {
 export interface ChatMessage {
   role: 'user' | 'model';
   content: string;
+  image_url?: string;
 }
 
 interface AppState {
