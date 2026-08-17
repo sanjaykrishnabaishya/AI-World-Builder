@@ -36,15 +36,19 @@ def generate_world_lore(spark: str) -> WorldLore:
     return WorldLore.model_validate_json(response.text)
 
 def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str, str]]) -> str:
-    system_instruction = "You are the Story Weaver, an AI assistant in Atlas Studio helping an author write a story."
+    system_instruction = "You are the Story Weaver in Atlas Studio. You assist the user in writing and editing their story."
     if lore:
         system_instruction += f"\n\nYou are writing a story set in: {lore.world_name}\nLore context: {lore.core_history}\nFactions: {[f.name for f in lore.factions]}\n"
     
-    system_instruction += "\nIf the user is just starting, ask them for their main character details, setting, and tone. Give them explicit control: ask if they want to provide the details manually or if they want you to auto-generate them. Keep your responses engaging, collaborative, and concise."
+    system_instruction += """
+    CRITICAL INSTRUCTIONS:
+    1. SIMPLE ENGLISH: Always speak in simple English that a child can understand.
+    2. USER CONTROL: The control is 100% with the user. If they ask to change a character's name, ONLY change that name and reply with the corrected sentence or paragraph. DO NOT rewrite the entire story or context unless they explicitly ask you to change everything.
+    3. Be concise and confirm exactly what you altered.
+    """
 
     contents = []
     for msg in history:
-        # The frontend uses 'model' or 'user' roles, which maps perfectly to Gemini
         contents.append({"role": msg['role'], "parts": [{"text": msg['content']}]})
         
     contents.append({"role": "user", "parts": [{"text": message}]})
@@ -59,6 +63,35 @@ def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str
     
     return response.text
 
+def generate_story_stream(lore: WorldLore):
+    prompt = f"""
+    You are the Atlas Studio Master Weaver. 
+    Using simple English that a child can understand, write a massive, incredibly detailed story based on the following world lore.
+    Your goal is to write a very long story (aiming for over 6,000 words).
+    
+    World Lore:
+    Name: {lore.world_name}
+    History: {lore.core_history}
+    Magic/Tech: {lore.magic_system}
+    
+    Requirements:
+    1. SIMPLE ENGLISH: Use simple words, short sentences, and clear descriptions so a 5th grader can read it easily.
+    2. LENGTH: Write as much as you possibly can. Build deep character arcs, intense dialogue, and long descriptions of the locations. Do not summarize.
+    3. CHARACTERS: Invent multiple interesting characters.
+    
+    Begin writing the story now:
+    """
+    
+    response = client.models.generate_content_stream(
+        model="gemini-3.6-flash",
+        contents=prompt
+    )
+    
+    for chunk in response:
+        yield chunk.text
+
+import time
+
 def generate_image_from_prompt(prompt: str) -> str:
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {os.getenv('HUGGINGFACE_API_KEY')}"}
@@ -66,11 +99,24 @@ def generate_image_from_prompt(prompt: str) -> str:
     # We add a style prefix to ensure high quality results based on the Atlas Studio aesthetic
     full_prompt = f"digital art, highly detailed, cinematic lighting, masterpiece, concept art, {prompt}"
     
-    response = requests.post(API_URL, headers=headers, json={"inputs": full_prompt})
-    
-    if response.status_code != 200:
-        raise Exception(f"Hugging Face API Error: {response.text}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        response = requests.post(API_URL, headers=headers, json={"inputs": full_prompt})
         
-    image_bytes = response.content
-    base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
-    return f"data:image/jpeg;base64,{base64_encoded}"
+        if response.status_code == 200:
+            image_bytes = response.content
+            base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+            return f"data:image/jpeg;base64,{base64_encoded}"
+            
+        error_json = response.json() if response.content else {}
+        error_msg = str(error_json.get("error", response.text))
+        
+        if "currently loading" in error_msg.lower() or response.status_code == 503:
+            if attempt < max_retries - 1:
+                # Provide time for the free tier model to wake up and load into memory
+                time.sleep(15)
+                continue
+                
+        raise Exception(f"Hugging Face API Error: {error_msg}")
+        
+    raise Exception("Image generation failed after multiple retries. The model may be offline.")
