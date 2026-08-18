@@ -62,9 +62,8 @@ def generate_world_lore(spark: str, genre: str | None = None) -> WorldLore:
     """
     
     response = client.chat.completions.create(
-        model="google/gemini-1.5-flash",
+        model="google/gemini-2.0-flash-exp:free",
         messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
         temperature=1.0,
         presence_penalty=0.8
     )
@@ -121,7 +120,7 @@ def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str
     messages.append({"role": "user", "content": message})
 
     response = client.chat.completions.create(
-        model="google/gemini-1.5-flash",
+        model="google/gemini-2.0-flash-exp:free",
         messages=messages,
         temperature=0.7
     )
@@ -158,7 +157,7 @@ def generate_story_stream(lore: WorldLore, genre: str | None = None):
     """
     
     response = client.chat.completions.create(
-        model="google/gemini-1.5-flash",
+        model="google/gemini-2.0-flash-exp:free",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=8192,
         temperature=1.0,
