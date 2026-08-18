@@ -1,220 +1,448 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2, Sparkles, Folder, Plus, Settings2, Image as ImageIcon } from 'lucide-react';
+import { Send, Loader2, Plus, Settings2, MoreVertical, Edit2, Trash2, Archive, Search, Bell, Home as HomeIcon, Compass, Folder, ArrowLeft, Square, ChevronDown, ChevronUp, ChevronLeft, Copy, Download, FileText } from 'lucide-react';
 import { useAppStore } from './store';
 
 export default function Home() {
   const { 
-    projects, currentProjectId, createNewProject, loadProject, saveCurrentProject,
-    spark, setSpark, lore, setLore, 
-    storyContent, setStoryContent, appendStoryContent,
-    isLoading, setIsLoading, error, setError,
-    chatHistory, addMessage, isChatLoading, setIsChatLoading
+    projects, currentProjectId, createNewProject, loadProject, archiveProject, deleteProject, renameProject,
+    fetchProjects, pollProject,
+    isLoading, error,
+    isChatLoading,
+    currentView, setCurrentView, searchQuery, setSearchQuery,
+    startWorldGeneration, stopGeneration, sendChatMessage, sendChatImage,
+    generatingProjects, notifications, removeNotification,
+    selectedGenre, setSelectedGenre,
+    userEmail, login, logout, checkSession
   } = useAppStore();
 
   const [inputVal, setInputVal] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showWorldsDropdown, setShowWorldsDropdown] = useState(false);
+  const [showMenuForProject, setShowMenuForProject] = useState<string | null>(null);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isUserScrolled, setIsUserScrolled] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
+  const workspaceScrollRef = useRef<HTMLDivElement>(null);
+
+  // Derive active project
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  const spark = currentProject?.spark || '';
+  const lore = currentProject?.lore || null;
+  const storyContent = currentProject?.storyContent || '';
+  const chatHistory = currentProject?.chatHistory || [];
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isChatLoading, storyContent]);
+    if (checkSession()) {
+      fetchProjects();
+    }
+  }, [fetchProjects, checkSession]);
+
 
   useEffect(() => {
-    if (projects.length === 0 && !currentProjectId && !spark) {
-      createNewProject();
+    const activePollingIds = generatingProjects;
+    if (activePollingIds.length === 0) return;
+    
+    const interval = setInterval(() => {
+      activePollingIds.forEach(id => pollProject(id));
+    }, 2000); // Poll every 2 seconds
+    
+    return () => clearInterval(interval);
+  }, [generatingProjects, pollProject]);
+
+  useEffect(() => {
+    if (!isUserScrolled && chatEndRef.current) {
+        chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, []);
+  }, [chatHistory, isChatLoading, storyContent, isUserScrolled]);
 
-  const handleInitialGeneration = async () => {
-    if (!inputVal.trim()) return;
-    const currentSpark = inputVal;
-    setInputVal('');
-    setSpark(currentSpark);
-    setIsLoading(true);
-    setError(null);
-    setLore(null);
-    setStoryContent('');
-
-    try {
-      // 1. Generate World Lore
-      const loreRes = await fetch('http://127.0.0.1:8000/api/generate/world', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spark: currentSpark })
-      });
-      if (!loreRes.ok) throw new Error("Lore generation failed.");
-      const loreData = await loreRes.json();
-      setLore(loreData);
-      
-      // Save before story stream starts
-      saveCurrentProject();
-
-      // 2. Stream the 6000+ word story directly into the interface
-      const storyRes = await fetch('http://127.0.0.1:8000/api/generate/story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lore: loreData })
-      });
-      
-      if (!storyRes.body) throw new Error("Stream failed");
-      const reader = storyRes.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      
-      let done = false;
-      while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-        const chunkValue = decoder.decode(value, { stream: true });
-        appendStoryContent(chunkValue);
-      }
-      
-      saveCurrentProject();
-
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleWorkspaceScroll = (e: React.UIEvent<HTMLDivElement>) => {
+     const container = e.currentTarget;
+     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+     setIsUserScrolled(!isNearBottom);
   };
 
   const handleSendChat = async (overrideMsg?: string) => {
+    if (!currentProjectId) return;
     const msgToSend = overrideMsg || inputVal;
     if (!msgToSend.trim()) return;
+    setInputVal('');
     
-    // Image Generation Logic
     if (msgToSend.startsWith('/imagine ')) {
        const prompt = msgToSend.replace('/imagine ', '');
-       addMessage({ role: 'user', content: msgToSend });
-       setInputVal('');
-       setIsChatLoading(true);
-       
-       try {
-         const imgRes = await fetch('http://127.0.0.1:8000/api/generate/image', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ prompt: prompt })
-         });
-         
-         if (!imgRes.ok) throw new Error("Image generation failed (the model might be loading).");
-         const data = await imgRes.json();
-         addMessage({ role: 'model', content: `Generated image for: "${prompt}"`, image_url: data.image_url });
-       } catch (err: any) {
-         addMessage({ role: 'model', content: "Error: " + err.message + "\n\n(Wait 15 seconds and try again)." });
-       } finally {
-         setIsChatLoading(false);
-       }
+       await sendChatImage(currentProjectId, prompt);
        return;
     }
 
-    addMessage({ role: 'user', content: msgToSend });
-    setInputVal('');
-    setIsChatLoading(true);
-
-    try {
-      const chatRes = await fetch('http://127.0.0.1:8000/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msgToSend, lore: lore, history: chatHistory }) 
-      });
-      
-      if (!chatRes.ok) throw new Error("Chat backend offline.");
-      const data = await chatRes.json();
-      addMessage({ role: 'model', content: data.reply });
-    } catch (err: any) {
-      addMessage({ role: 'model', content: "Error: " + err.message });
-    } finally {
-      setIsChatLoading(false);
-    }
+    await sendChatMessage(currentProjectId, msgToSend);
   };
 
   const handleEnter = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!lore && !isLoading) {
-        handleInitialGeneration();
-      } else if (lore && !isChatLoading) {
+      if (!currentProject && !isLoading) {
+        startWorldGeneration(inputVal, selectedGenre);
+        setInputVal('');
+      } else if (currentProject && !isChatLoading && currentProject.status !== 'generating') {
         handleSendChat();
       }
     }
   };
 
-  return (
-    <div className="workspace-container">
-      
-      {/* Left Sidebar: Projects */}
-      <div className="sidebar-left">
-        <div className="top-nav" style={{ gap: '10px' }}>
-           <Globe size={20} color="var(--text-primary)" /> Atlas Studio
+  const activeProjects = projects.filter(p => !p.isArchived).reverse(); 
+  
+  const allTemplates = [
+    { name: "Superhero", desc: "Caped crusaders and extraordinary abilities", img: "/Superhero.jpeg" },
+    { name: "Action+Advanture", desc: "High-octane thrills and perilous journeys", img: "/Action.jpeg" },
+    { name: "Mythical", desc: "Gods, legends, and ancient magic", img: "/batch1_img5.jpg" },
+    { name: "Sci-Fi", desc: "Space exploration and advanced tech", img: "/bg_vertical.jpg" },
+    { name: "Dark Fantasy", desc: "Gritty, grim worlds with dangerous magic", img: "/batch2_img2.jpg" },
+    { name: "Ancient Civilization", desc: "Lost empires and forgotten histories", img: "/batch2_img3.jpg" },
+    { name: "Modern", desc: "Contemporary settings with a twist", img: "/mordern.jpeg" },
+    { name: "Dystopian Era", desc: "Bleak futures and totalitarian regimes", img: "/Dystopian.jpeg" },
+    { name: "Futuristic", desc: "Cyberpunk and highly advanced societies", img: "/futuristic.jpeg" },
+    { name: "Horror", desc: "Terrifying realms and cosmic dread", img: "/batch1_img2.jpg" },
+    { name: "Supernatural", desc: "Vampires, werewolves, and the occult", img: "/batch1_img3.jpg" },
+    { name: "High Fantasy", desc: "Epic quests, elves, and vast kingdoms", img: "/batch1_img1.jpg" },
+    { name: "Magic", desc: "Wizards, witches, and spellcrafting", img: "/batch2_img5.jpg" }
+  ];
+
+  const searchResults = searchQuery.trim() ? [
+     ...activeProjects.filter(p => (p.customName || p.lore?.world_name || p.spark).toLowerCase().includes(searchQuery.toLowerCase())).map(p => ({ type: 'world', data: p })),
+     ...allTemplates.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase())).map(t => ({ type: 'template', name: t.name, img: t.img }))
+  ] : [];
+
+  const renderSidebarNav = () => (
+    <div className="sidebar-left" style={{ width: '280px', zIndex: 10 }}>
+        <div style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '0px' }}>
+           <img src="/logo_mark.png" alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'cover', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,1)) brightness(1.2)' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+           <img src="/logo_text.png" alt="ATLAS STUDIO" style={{ height: '28px', objectFit: 'contain', marginTop: '2px', marginLeft: '-12px', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,1)) brightness(1.2)' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         </div>
         
-        <div style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
-          <button className="btn-secondary" style={{ width: '100%', marginBottom: '2rem', display: 'flex', justifyContent: 'flex-start', gap: '10px' }} onClick={createNewProject}>
-            <Plus size={18} /> New chat
-          </button>
-
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem' }}>History</p>
+        <div style={{ padding: '1rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div 
+            onClick={() => setCurrentView('dashboard')} 
+            style={{ padding: '0.75rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: currentView === 'dashboard' ? 'var(--accent-glow)' : 'transparent', color: currentView === 'dashboard' ? 'var(--accent-gold)' : '#c59b27' }}
+          >
+            <HomeIcon size={18} /> Home
+          </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-             {projects.map(p => (
-               <div 
-                 key={p.id} 
-                 onClick={() => loadProject(p.id)}
-                 style={{ 
-                   padding: '0.5rem', 
-                   background: currentProjectId === p.id ? 'var(--bg-surface-hover)' : 'transparent',
-                   borderRadius: '6px', 
-                   cursor: 'pointer',
-                   display: 'flex',
-                   alignItems: 'center',
-                   gap: '10px',
-                   color: currentProjectId === p.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                   fontSize: '0.9rem'
-                 }}
-               >
-                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                   {p.lore?.world_name || p.spark || "Empty Project"}
-                 </span>
+          <div style={{ padding: '1rem 1rem 0.5rem 1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.9rem', fontWeight: 500 }}>
+            <Folder size={16} /> My Worlds
+          </div>
+
+          <div style={{ paddingLeft: '2.5rem', paddingRight: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+            {activeProjects.map(p => (
+               <div key={p.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                 <div 
+                   onClick={() => loadProject(p.id)}
+                   style={{ fontSize: '0.9rem', color: currentProjectId === p.id ? 'var(--accent-gold)' : 'var(--text-secondary)', cursor: 'pointer', padding: '0.4rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                 >
+                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                      {p.customName || p.lore?.world_name || "Untitled World"}
+                      {p.status === 'generating' && <Loader2 size={12} className="animate-spin" style={{ display: 'inline', marginLeft: '5px' }}/>}
+                    </div>
+                    
+                    <MoreVertical 
+                      size={14} 
+                      style={{ opacity: 0.7, flexShrink: 0, marginLeft: '8px' }} 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenuForProject(showMenuForProject === p.id ? null : p.id);
+                      }}
+                    />
+                 </div>
+
+                  {showMenuForProject === p.id && (
+                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.2rem', marginBottom: '0.4rem', padding: '0.2rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                        <div style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '0.7rem', padding: '0.3rem 0.4rem', borderRadius: '4px' }} onClick={(e) => { e.stopPropagation(); const newName = window.prompt("Rename world:"); if (newName) renameProject(p.id, newName); setShowMenuForProject(null); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}><Edit2 size={12}/> Rename</div>
+                        <div style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '0.7rem', padding: '0.3rem 0.4rem', borderRadius: '4px' }} onClick={(e) => { e.stopPropagation(); archiveProject(p.id); setShowMenuForProject(null); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}><Archive size={12}/> Archive</div>
+                        <div style={{ flex: '1 1 auto', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#ff4444', fontSize: '0.7rem', padding: '0.3rem 0.4rem', borderRadius: '4px' }} onClick={(e) => { e.stopPropagation(); if (window.confirm("Are you sure you want to permanently delete this world?")) deleteProject(p.id); setShowMenuForProject(null); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}><Trash2 size={12}/> Delete</div>
+                     </div>
+                  )}
                </div>
-             ))}
+            ))}
+            {activeProjects.length === 0 && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No worlds yet.</span>}
           </div>
         </div>
+        
+        <div style={{ padding: '1.5rem 1rem', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+           <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>Account</p>
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <img src="/profile.jpg" alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top' }} />
+                <span style={{ fontSize: '0.9rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{userEmail}</span>
+             </div>
+             <button onClick={() => logout()} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0.4rem 0.6rem', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.color = '#fff'} onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}>Logout</button>
+           </div>
+        </div>
+    </div>
+  );
+
+  const renderTopBar = () => (
+    <div style={{ padding: '1.5rem 3rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '2rem' }}>
+       <div style={{ position: 'relative', width: '400px' }}>
+          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+          <input 
+            type="text" 
+            className="input-base" 
+            placeholder="Search Worlds, Genres..." 
+            style={{ paddingLeft: '3rem', background: '#111218' }}
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setShowSearchDropdown(true); }}
+            onFocus={() => setShowSearchDropdown(true)}
+            onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+          />
+          {showSearchDropdown && searchResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '12px', marginTop: '0.5rem', padding: '0.5rem', zIndex: 50, boxShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>
+              {searchResults.map((res: any, idx) => (
+                <div 
+                  key={idx} 
+                  style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderRadius: '8px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => {
+                    if (res.type === 'world') {
+                       loadProject(res.data.id);
+                    } else {
+                       createNewProject(res.name);
+                    }
+                  }}
+                >
+                  {res.type === 'world' ? <Folder size={14} color="var(--accent-gold)"/> : <Compass size={14} color="var(--accent-color)" />}
+                  {res.type === 'world' ? (res.data.customName || res.data.lore?.world_name || res.data.spark) : res.name}
+                </div>
+              ))}
+            </div>
+          )}
+       </div>
+       
+       <div style={{ position: 'relative' }}>
+         <Bell 
+            size={20} 
+            color={notifications.length > 0 ? 'var(--accent-gold)' : '#fff'} 
+            style={{ cursor: 'pointer', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}
+            onClick={() => setShowNotifications(!showNotifications)}
+         />
+         {notifications.length > 0 && <div style={{ position: 'absolute', top: -2, right: -2, width: '8px', height: '8px', background: 'red', borderRadius: '50%' }} />}
+         
+         {showNotifications && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '12px', marginTop: '1rem', width: '300px', zIndex: 50, boxShadow: '0 10px 30px rgba(0,0,0,0.8)', padding: '1rem' }}>
+               <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Notifications</h4>
+               {notifications.length === 0 ? <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>No new notifications.</p> : null}
+               {notifications.map(n => (
+                  <div key={n.id} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', marginBottom: '0.5rem', cursor: 'pointer' }} onClick={() => { loadProject(n.projectId); removeNotification(n.id); setShowNotifications(false); }}>
+                     <p style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', marginBottom: '4px' }}>Generation Complete</p>
+                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{n.message}</p>
+                  </div>
+               ))}
+            </div>
+         )}
+       </div>
+
+       <button className="btn-gold" onClick={() => createNewProject(null)}>
+         <Plus size={18} /> New World
+       </button>
+    </div>
+  );
+
+  const renderDashboard = () => (
+    <div className="workspace-container">
+      {renderSidebarNav()}
+      <div 
+        ref={workspaceScrollRef}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', position: 'relative' }}
+        onScroll={handleWorkspaceScroll}
+      >
+        
+        <div style={{ position: 'relative', zIndex: 10 }}>
+           {renderTopBar()}
+        </div>
+
+        <div style={{ padding: '0 3rem 3rem 3rem', maxWidth: '1400px', width: '100%', position: 'relative', zIndex: 10 }}>
+           <div style={{ maxWidth: '600px', marginTop: '2rem', marginBottom: '4rem' }}>
+              <h1 style={{ fontSize: '3.5rem', lineHeight: 1.1, marginBottom: '1rem', color: '#fff', fontWeight: 300, textShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>Build worlds<br/>beyond <span style={{ color: 'var(--accent-gold)', fontStyle: 'italic' }}>imagination</span></h1>
+              <p style={{ color: '#eee', fontSize: '1.1rem', marginBottom: '2rem', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>Atlas Studio is your AI-powered worldbuilding studio.<br/>Create immersive worlds for stories, games, and more.</p>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                 <button className="btn-gold" onClick={() => createNewProject(null)}><Plus size={18}/> Create New World</button>
+                 <button className="btn-secondary" style={{ borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => document.getElementById('explore-section')?.scrollIntoView({ behavior: 'smooth' })}><Compass size={18}/> Explore Genres</button>
+              </div>
+           </div>
+
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+             <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>My Worlds</h2>
+             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setCurrentView('my-worlds')}>View All &gt;</span>
+           </div>
+
+           <div className="dashboard-grid" style={{ marginBottom: '4rem' }}>
+              {activeProjects.slice(0, 8).map(p => {
+                 const firstImageMsg = p.chatHistory.find(m => m.image_url);
+                 const charCodeSum = p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                 const fallbackIndex = charCodeSum % 38;
+                 const batchNum = Math.floor(fallbackIndex / 5) + 1;
+                 const imgNum = (fallbackIndex % 5) + 1;
+                 const thumbUrl = firstImageMsg?.image_url || `/batch${batchNum}_img${imgNum}.jpg`; 
+                 return (
+                   <div key={p.id} className="world-card" onClick={() => loadProject(p.id)}>
+                     <div className="world-card-image" style={{ backgroundImage: `url('${thumbUrl}')` }} />
+                     <div style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                           <h3 style={{ fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.customName || p.lore?.world_name || "Untitled World"}</h3>
+                           <MoreVertical size={16} color="var(--text-secondary)" onClick={(e) => { e.stopPropagation(); archiveProject(p.id); }} />
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                           {p.status === 'generating' ? <span style={{color: 'var(--accent-gold)'}}>Generating... <Loader2 size={10} className="animate-spin" style={{display:'inline'}}/></span> : 
+                           (p.lore ? 'Detailed World' : 'Sparked World')}
+                        </p>
+                     </div>
+                   </div>
+                 );
+              })}
+              {activeProjects.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>You haven't forged any worlds yet.</p>}
+           </div>
+
+           <div id="explore-section">
+             <h2 style={{ fontSize: '2rem', fontWeight: 300, marginBottom: '1rem' }}>Explore <span style={{ color: 'var(--accent-gold)' }}>Genres</span></h2>
+             <p style={{ color: 'var(--text-secondary)', marginBottom: '3rem' }}>Select a genre to strictly enforce its aesthetic, rules, and worldbuilding layout for your next creation.</p>
+             
+             <div className="dashboard-scroll-row">
+                {allTemplates.map(t => (
+                   <div key={t.name} className="world-card" onClick={() => createNewProject(t.name)}>
+                      <div className="world-card-image" style={{ backgroundImage: `url('${t.img}')` }} />
+                      <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                         <h3 style={{ fontSize: '1.2rem', color: 'var(--accent-gold)', marginBottom: '0.5rem' }}>{t.name}</h3>
+                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t.desc}</p>
+                      </div>
+                   </div>
+                ))}
+             </div>
+           </div>
+        </div>
       </div>
+    </div>
+  );
 
-      {/* Center Canvas: AI Chat & Story Generation */}
+
+  const renderMyWorlds = () => (
+    <div className="workspace-container">
+      {renderSidebarNav()}
+      <div ref={workspaceScrollRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }} onScroll={handleWorkspaceScroll}>
+        {renderTopBar()}
+        <div style={{ padding: '0 3rem 3rem 3rem', maxWidth: '1400px', width: '100%' }}>
+           <h2 style={{ fontSize: '2rem', fontWeight: 300, marginBottom: '3rem' }}>All <span style={{ color: 'var(--accent-gold)' }}>Worlds</span></h2>
+           <div className="dashboard-grid">
+              {activeProjects.map(p => {
+                 const firstImageMsg = p.chatHistory.find(m => m.image_url);
+                 const charCodeSum = p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                 const fallbackIndex = charCodeSum % 38;
+                 const batchNum = Math.floor(fallbackIndex / 5) + 1;
+                 const imgNum = (fallbackIndex % 5) + 1;
+                 const thumbUrl = firstImageMsg?.image_url || `/batch${batchNum}_img${imgNum}.jpg`; 
+                 return (
+                   <div key={p.id} className="world-card" onClick={() => loadProject(p.id)}>
+                     <div className="world-card-image" style={{ backgroundImage: `url('${thumbUrl}')` }} />
+                     <div style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                           <h3 style={{ fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.customName || p.lore?.world_name || "Untitled World"}</h3>
+                           <MoreVertical size={16} color="var(--text-secondary)" onClick={(e) => { e.stopPropagation(); archiveProject(p.id); }} />
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                           {p.status === 'generating' ? <span style={{color: 'var(--accent-gold)'}}>Generating... <Loader2 size={10} className="animate-spin" style={{display:'inline'}}/></span> : 
+                           (p.lore ? 'Detailed World' : 'Sparked World')}
+                        </p>
+                     </div>
+                   </div>
+                 );
+              })}
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderWorkspace = () => {
+    const isGenerating = currentProject?.status === 'generating';
+
+    return (
+    <div className="workspace-container">
+      {renderSidebarNav()}
+
       <div className="center-canvas">
-         <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-            
-            {!lore && !isLoading && !storyContent && (
+         <div className="top-nav" style={{ justifyContent: 'space-between' }}>
+             <span style={{ display: 'flex', alignItems: 'center', gap: '15px', color: 'var(--text-primary)' }}>
+               <ArrowLeft size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setCurrentView('dashboard')} />
+               <span style={{ fontWeight: 500 }}>
+                 {currentProject?.customName || lore?.world_name || "New Workspace"}
+                 {(currentProject?.genre || selectedGenre) && <span style={{ marginLeft: '10px', fontSize: '0.75rem', background: 'var(--accent-glow)', color: 'var(--accent-gold)', padding: '2px 8px', borderRadius: '12px' }}>{currentProject?.genre || selectedGenre}</span>}
+               </span>
+             </span>
+         </div>
+
+         <div ref={workspaceScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'flex', flexDirection: 'column' }} onScroll={handleWorkspaceScroll}>
+            {!currentProject && !isLoading && (
                <div style={{ margin: 'auto', textAlign: 'center', maxWidth: '600px' }}>
-                  <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>What world shall we weave?</h1>
-                  <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Describe your universe, and the Atlas engine will generate its history, characters, and a massive story.</p>
+                  <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-primary)', fontWeight: 300 }}>What world shall we weave?</h1>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Describe your universe, and the Atlas engine will generate its history, characters, and a massive story in the background.</p>
                </div>
             )}
 
-            {isLoading && !storyContent && (
+            {isLoading && (
                <div style={{ margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                  <Loader2 className="animate-spin" size={48} color="var(--accent-color)" />
-                  <p style={{ color: 'var(--text-secondary)' }}>Forging World Lore...</p>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px var(--accent-glow)' }}>
+                     <Loader2 className="animate-spin" size={32} color="var(--accent-gold)" />
+                  </div>
+                  <p style={{ color: 'var(--text-secondary)' }}>Forging World Lore in the background...</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', opacity: 0.7 }}>You can return home and start another world while you wait!</p>
                </div>
             )}
 
-            {(storyContent || lore) && (
+            {currentProject?.error && (
+               <div style={{ margin: 'auto', maxWidth: '600px', padding: '1.5rem', background: 'rgba(255, 68, 68, 0.1)', border: '1px solid rgba(255, 68, 68, 0.3)', borderRadius: '12px' }}>
+                  <h3 style={{ color: '#ff4444', marginBottom: '0.5rem', fontSize: '1.2rem' }}>Generation Error</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                     {currentProject.error.includes("429") || currentProject.error.includes("RESOURCE_EXHAUSTED") 
+                        ? "You have exhausted the Google Gemini API Free Tier daily quota (20 requests/day). To continue generating worlds, please upgrade your Google API key to a Pay-as-you-go plan in Google AI Studio, or wait for your daily limit to reset."
+                        : currentProject.error}
+                  </p>
+               </div>
+            )}
+
+            {(storyContent || lore || isGenerating) && (
                <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-                  <div className="chat-message user" style={{ marginBottom: '2rem' }}>
+                  <div className="chat-message user" style={{ marginBottom: '2rem', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', color: 'white' }}>
                      {spark}
                   </div>
                   
-                  {storyContent && (
-                    <div className="chat-message ai" style={{ marginBottom: '2rem' }}>
-                      <p style={{ whiteSpace: 'pre-wrap', fontSize: '1.1rem', color: '#e3e3e3' }}>{storyContent}</p>
-                      {isLoading && <Loader2 className="animate-spin" size={20} style={{ marginTop: '1rem' }} color="var(--accent-color)" />}
+                  {(storyContent || isGenerating) && (
+                    <div className="chat-message ai" style={{ marginBottom: '2rem', background: (isGenerating && !storyContent) ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', color: 'white', transition: 'background 0.5s ease' }}>
+                      <p className="story-font" style={{ whiteSpace: 'pre-wrap' }}>{storyContent}</p>
+                      {isGenerating && !storyContent && (
+                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '4rem 2rem', perspective: '1000px' }}>
+                            <div style={{ transformStyle: 'preserve-3d', animation: 'logo-spin 3s linear infinite' }}>
+                               <img src="/logo_mark.png" alt="Generating..." style={{ width: '90px', height: '90px', filter: 'drop-shadow(0 4px 15px rgba(0,0,0,0.8))' }} />
+                            </div>
+                            <span style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 500, textShadow: '0 4px 15px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,0.8)' }}>
+                               Generating Story<span className="dot-1">.</span><span className="dot-2">.</span><span className="dot-3">.</span>
+                            </span>
+                         </div>
+                      )}
+                      {isGenerating && storyContent && (
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '1rem', color: 'var(--accent-gold)' }}>
+                            <Loader2 className="animate-spin" size={20} />
+                            <span style={{ fontSize: '0.9rem' }}>Weaving the story...</span>
+                         </div>
+                      )}
                     </div>
                   )}
 
                   {chatHistory.slice(1).map((msg, i) => (
-                    <div key={i} className={`chat-message ${msg.role === 'user' ? 'user' : 'ai'}`}>
-                       <p style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+                    <div key={i} className={`chat-message ${msg.role === 'user' ? 'user' : 'ai'}`} style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', color: 'white' }}>
+                       <p className={msg.role === 'ai' ? 'story-font' : ''} style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
                        {msg.image_url && (
                          <img src={msg.image_url} alt="Generated Art" style={{ marginTop: '1rem', width: '100%', borderRadius: '12px' }} />
                        )}
@@ -222,8 +450,11 @@ export default function Home() {
                   ))}
 
                   {isChatLoading && (
-                    <div className="chat-message ai">
-                      <Loader2 className="animate-spin" size={24} color="var(--accent-color)" />
+                    <div className="chat-message ai" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', color: 'white' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-gold)' }}>
+                          <Loader2 className="animate-spin" size={24} />
+                          <span>Weaving Response...</span>
+                       </div>
                     </div>
                   )}
                   {error && <p style={{ color: '#ff4444', textAlign: 'center' }}>{error}</p>}
@@ -232,17 +463,44 @@ export default function Home() {
             <div ref={chatEndRef} />
          </div>
 
-         {/* Bottom Input Area */}
          <div style={{ padding: '2rem', maxWidth: '800px', width: '100%', margin: '0 auto' }}>
-             
-             {lore && !isLoading && (
-               <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                  <button className="btn-secondary" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => handleSendChat("I want to change the main character's name to Aris.")}>
-                    Change Character Name
-                  </button>
+             {lore && !isGenerating && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '1rem', paddingBottom: '0.5rem', alignItems: 'center' }}>
                   <button className="btn-secondary" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => handleSendChat("/imagine A highly detailed digital painting of the main location")}>
                     Generate Location Image
                   </button>
+                  <button className="btn-secondary" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => handleSendChat("/imagine A highly detailed digital painting of the main character")}>
+                    Generate Character Image
+                  </button>
+
+                  <div style={{ flex: 1 }} />
+
+                  {storyContent && (
+                    <>
+                      <button className="btn-secondary" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} onClick={() => { navigator.clipboard.writeText(storyContent); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                        <Copy size={14} /> {copied ? "Copied!" : "Copy Story"}
+                      </button>
+
+                      <div style={{ position: 'relative' }}>
+                         <button className="btn-gold" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', padding: '0.4rem 0.8rem', borderRadius: '8px' }} onClick={() => setShowDownloadMenu(!showDownloadMenu)}>
+                            <Download size={14} /> Download {showDownloadMenu ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                         </button>
+                         {showDownloadMenu && (
+                            <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '0.2rem', background: 'var(--bg-elevated)', border: '1px solid var(--accent-gold)', borderRadius: '6px', zIndex: 100, minWidth: '90px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column' }}>
+                               <div title="Download TXT" style={{ cursor: 'pointer', padding: '0.3rem 0.6rem', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: 'var(--text-primary)' }} onClick={() => { const blob = new Blob([storyContent], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${lore?.world_name || 'Story'}.txt`; a.click(); setShowDownloadMenu(false); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(200, 170, 110, 0.15)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                  <FileText size={12} color="#aaa"/> TXT
+                               </div>
+                               <div title="Download DOCX" style={{ cursor: 'pointer', padding: '0.3rem 0.6rem', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: 'var(--text-primary)' }} onClick={() => { fetch(`http://127.0.0.1:8000/api/project/${currentProjectId}/download/docx`, { headers: { 'X-User-Email': userEmail || '' }}).then(res => res.blob()).then(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${lore?.world_name || 'Story'}.docx`; a.click(); URL.revokeObjectURL(url); setShowDownloadMenu(false); }); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(200, 170, 110, 0.15)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                  <FileText size={12} color="#4285F4"/> DOCX
+                               </div>
+                               <div title="Download PDF" style={{ cursor: 'pointer', padding: '0.3rem 0.6rem', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.7rem', color: 'var(--text-primary)' }} onClick={() => { fetch(`http://127.0.0.1:8000/api/project/${currentProjectId}/download/pdf`, { headers: { 'X-User-Email': userEmail || '' }}).then(res => res.blob()).then(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${lore?.world_name || 'Story'}.pdf`; a.click(); URL.revokeObjectURL(url); setShowDownloadMenu(false); }); }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(200, 170, 110, 0.15)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                                  <FileText size={12} color="#EA4335"/> PDF
+                               </div>
+                            </div>
+                         )}
+                      </div>
+                    </>
+                  )}
                </div>
              )}
 
@@ -250,19 +508,30 @@ export default function Home() {
                 <textarea 
                   className="input-base" 
                   style={{ border: 'none', background: 'transparent', resize: 'none', minHeight: '44px', maxHeight: '200px', padding: '0.5rem 1rem' }}
-                  placeholder={!lore ? "Message Atlas Studio..." : "Ask the Weaver to edit the story, or use /imagine..."}
+                  placeholder={!lore ? "Message Atlas Studio..." : "Ask the Weaver what happens next, or use /imagine..."}
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   onKeyDown={handleEnter}
                 />
-                <button 
-                  className="btn-primary" 
-                  style={{ borderRadius: '50%', padding: '0.6rem', width: '40px', height: '40px' }}
-                  onClick={() => !lore ? handleInitialGeneration() : handleSendChat()} 
-                  disabled={isLoading || isChatLoading || !inputVal.trim()}
-                >
-                  <Send size={18} />
-                </button>
+                
+                {isGenerating ? (
+                   <button 
+                     className="btn-primary" 
+                     style={{ borderRadius: '50%', padding: '0.6rem', width: '40px', height: '40px', background: '#ff4444' }}
+                     onClick={() => currentProjectId && stopGeneration(currentProjectId)} 
+                   >
+                     <Square size={16} fill="#fff" color="#fff" />
+                   </button>
+                ) : (
+                   <button 
+                     className="btn-primary" 
+                     style={{ borderRadius: '50%', padding: '0.6rem', width: '40px', height: '40px', background: 'var(--text-primary)' }}
+                     onClick={() => !lore ? (inputVal.trim() && startWorldGeneration(inputVal, selectedGenre)) : handleSendChat()} 
+                     disabled={isLoading || isChatLoading || !inputVal.trim()}
+                   >
+                     {isLoading || isChatLoading ? <Loader2 size={18} className="animate-spin" color="#000" /> : <Send size={18} color="#000" />}
+                   </button>
+                )}
              </div>
              <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                Atlas Studio can make mistakes. Check important info.
@@ -270,30 +539,30 @@ export default function Home() {
          </div>
       </div>
 
-      {/* Right Sidebar: Context / Lore */}
       {lore && (
-        <div className="sidebar-right">
-          <div className="top-nav" style={{ justifyContent: 'space-between' }}>
-             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Settings2 size={18} /> World Context</span>
+        <div className="sidebar-right" style={{ width: '350px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderLeft: '1px solid var(--border-subtle)' }}>
+          <div className="top-nav" style={{ justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)' }}>
+             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Settings2 size={18} color="var(--accent-gold)" /> World Context</span>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div className="lore-panel">
-               <h3>World Name</h3>
-               <p style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{lore.world_name}</p>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+               <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>World Name</h3>
+               <p style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: '1.1rem' }}>{lore.world_name}</p>
             </div>
-            <div className="lore-panel">
-               <h3>Core Setting</h3>
-               <p>{lore.core_history}</p>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+               <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Core Setting</h3>
+               <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{lore.core_history}</p>
             </div>
-            <div className="lore-panel">
-               <h3>Magic & Technology</h3>
-               <p>{lore.magic_system}</p>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+               <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Magic & Technology</h3>
+               <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{lore.magic_system}</p>
             </div>
-            <div className="lore-panel">
-               <h3>Major Factions</h3>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)' }}>
+               <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Major Factions</h3>
                {lore.factions.map((f, i) => (
-                 <div key={i} style={{ marginBottom: '0.5rem' }}>
-                   <span style={{ color: 'var(--text-primary)' }}>{f.name}</span> — <span style={{ fontSize: '0.8rem' }}>{f.description}</span>
+                 <div key={i} style={{ marginBottom: '1rem' }}>
+                   <span style={{ color: 'var(--accent-gold)', fontWeight: 500 }}>{f.name}</span><br/>
+                   <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{f.description}</span>
                  </div>
                ))}
             </div>
@@ -301,5 +570,67 @@ export default function Home() {
         </div>
       )}
     </div>
+    );
+  }
+
+  const renderGlobalBackground = () => (
+    <div ref={bgRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1, willChange: 'transform' }}>
+       <video 
+         autoPlay 
+         muted 
+         loop
+         playsInline 
+         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+       >
+          <source src="/seamless_bg.mp4" type="video/mp4" />
+       </video>
+       <div style={{ position: 'absolute', inset: 0, background: 'rgba(6, 7, 10, 0.5)' }} />
+       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '300px', background: 'linear-gradient(to bottom, transparent, var(--bg-base))' }} />
+    </div>
+  );
+
+  if (!userEmail) {
+     return (
+       <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', position: 'relative', overflow: 'hidden' }}>
+         <video autoPlay loop muted playsInline style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5, zIndex: 0 }}>
+            <source src="/hero_bg_video.mp4" type="video/mp4" />
+         </video>
+         <div style={{ position: 'relative', zIndex: 10, background: 'rgba(10,10,10,0.8)', padding: '3rem', borderRadius: '16px', border: '1px solid var(--border-subtle)', backdropFilter: 'blur(10px)', textAlign: 'center', width: '400px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0px', marginBottom: '2rem' }}>
+              <img src="/logo_mark.png" alt="Logo" style={{ width: '48px', height: '48px', objectFit: 'cover', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,1)) brightness(1.2)' }} />
+              <img src="/logo_text.png" alt="ATLAS STUDIO" style={{ height: '28px', objectFit: 'contain', marginTop: '2px', marginLeft: '-12px', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,1)) brightness(1.2)' }} />
+            </div>
+            <h2 style={{ color: '#fff', marginBottom: '0.5rem', fontWeight: 500 }}>Welcome Back</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.9rem' }}>Enter your email to access your worlds.</p>
+            <input 
+              type="email" 
+              placeholder="Email address" 
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && emailInput.trim()) login(emailInput.trim()); }}
+              style={{ width: '100%', padding: '1rem', borderRadius: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: '#fff', marginBottom: '1rem', outline: 'none' }}
+            />
+            <button 
+              className="btn-gold" 
+              style={{ width: '100%', justifyContent: 'center', padding: '1rem' }}
+              onClick={() => { if (emailInput.trim()) login(emailInput.trim()); }}
+            >
+              Sign In
+            </button>
+         </div>
+       </div>
+     );
+  }
+
+  let viewContent = null;
+  if (currentView === 'my-worlds') viewContent = renderMyWorlds();
+  else if (currentView === 'dashboard') viewContent = renderDashboard();
+  else viewContent = renderWorkspace();
+
+  return (
+    <>
+      {renderGlobalBackground()}
+      {viewContent}
+    </>
   );
 }

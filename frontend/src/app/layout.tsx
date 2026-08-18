@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Outfit, Merriweather } from "next/font/google";
 import "./globals.css";
 import Fireflies from "./components/Fireflies";
 
-const inter = Inter({ subsets: ["latin"] });
+const outfit = Outfit({ 
+  subsets: ["latin"],
+  variable: "--font-outfit", 
+});
+
+const merriweather = Merriweather({ 
+  weight: ['300', '400', '700'],
+  subsets: ["latin"],
+  variable: "--font-merriweather",
+});
 
 export const metadata: Metadata = {
   title: "Atlas Studio",
@@ -13,7 +22,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${outfit.variable} ${merriweather.variable}`}>
         <Fireflies />
         {children}
       </body>
