@@ -70,11 +70,11 @@ def generate_world_lore(spark: str, genre: str | None = None) -> WorldLore:
     
     try:
         lore_data = response.choices[0].message.content
-        # Sometimes models wrap in markdown despite instructions
-        if lore_data.startswith("```json"):
-            lore_data = lore_data[7:]
-        if lore_data.endswith("```"):
-            lore_data = lore_data[:-3]
+        # Extract JSON block even if the model prefixes with conversational text
+        start = lore_data.find('{')
+        end = lore_data.rfind('}')
+        if start != -1 and end != -1:
+            lore_data = lore_data[start:end+1]
         
         import json
         # Try to sanitize any weird characters in keys if needed, but strict prompt usually fixes it.
