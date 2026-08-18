@@ -28,8 +28,8 @@ body {
 
 .story-font {
   font-family: var(--font-merriweather), serif;
-  font-size: 1.15rem;
-  line-height: 1.8;
+  font-size: 1.2rem;
+  line-height: 1.9;
   color: #f3f0fa;
 }
 
@@ -101,7 +101,8 @@ body {
 }
 
 .world-card {
-  background: var(--bg-surface);
+  background: rgba(10, 12, 16, 0.8);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   overflow: hidden;
@@ -119,11 +120,11 @@ body {
   height: 240px;
   background-size: contain;
   background-repeat: no-repeat;
-  background-position: center center;
+  background-position: center top;
   position: relative;
-  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
-  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
-  opacity: 0.9;
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 90%);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 90%);
+  opacity: 1;
 }
 
 .hero-section {
@@ -269,6 +270,31 @@ h1, h2, h3, h4, h5, h6 {
   background: linear-gradient(to top, #a67b08, #ebd888);
 }
 
+.btn-glass-gradient {
+  background: linear-gradient(135deg, rgba(20, 22, 28, 0.9), rgba(40, 45, 60, 0.5));
+  backdrop-filter: blur(12px);
+  color: var(--accent-gold);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.6rem 1.2rem;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-glass-gradient:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(30, 33, 42, 0.95), rgba(50, 56, 75, 0.6));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 0 15px rgba(200, 170, 110, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border-color: rgba(200, 170, 110, 0.4);
+}
+
 .btn-secondary {
   background: transparent;
   color: var(--text-secondary);
@@ -291,11 +317,12 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Chat Bubbles */
 .chat-message {
-  padding: 1.5rem;
-  border-radius: 12px;
+  padding: 2.5rem 3rem;
+  border-radius: 16px;
   margin-bottom: 1rem;
   width: 100%;
   max-width: 800px;
+  min-height: 150px;
   margin-left: auto;
   margin-right: auto;
   line-height: 1.6;
@@ -368,3 +395,74 @@ h1, h2, h3, h4, h5, h6 {
 .dot-1 { animation: dot-blink 1.5s infinite; }
 .dot-2 { animation: dot-blink 1.5s infinite 0.3s; }
 .dot-3 { animation: dot-blink 1.5s infinite 0.6s; }
+
+.mobile-only { display: none; }
+
+/* --- Responsive Media Queries --- */
+@media (max-width: 900px) {
+  .mobile-only { display: block !important; }
+  .sidebar-left {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 100 !important;
+    background: rgba(10, 10, 10, 0.95);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--border-subtle);
+  }
+  .sidebar-left.open {
+    transform: translateX(0);
+  }
+  .sidebar-right {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 100 !important;
+  }
+  .sidebar-right.open {
+    transform: translateX(0);
+  }
+  .mobile-header {
+    display: flex !important;
+  }
+  .workspace-container {
+    flex-direction: column !important;
+  }
+  .top-nav {
+    margin: 0.5rem;
+    padding: 0 1rem;
+    height: 50px;
+  }
+  .padding-responsive {
+    padding: 1rem !important;
+  }
+}
+
+.mobile-header {
+  display: none;
+  height: 60px;
+  border-bottom: 1px solid var(--border-subtle);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  background: rgba(10,10,10,0.8);
+  backdrop-filter: blur(12px);
+  z-index: 90;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 95;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

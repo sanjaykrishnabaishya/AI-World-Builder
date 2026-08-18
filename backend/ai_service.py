@@ -109,6 +109,7 @@ def chat_with_world(message: str, lore: WorldLore | None, history: List[Dict[str
     3. SIMPLE ENGLISH: Always speak in simple English that a child can understand.
     4. USER CONTROL: If they ask to change a character's name, ONLY change that name and reply with the corrected sentence or paragraph.
     5. Be concise unless writing the next story chapter.
+    6. SMART IMAGE GENERATION: If the user asks for an image, picture, or portrait of a character, location, or scene, DO NOT describe it in paragraph form. Instead, you MUST respond EXACTLY with a command starting with `/imagine ` followed by a highly detailed, comma-separated visual description of the subject. Example: `/imagine A towering obsidian fortress on a cliff, dark clouds, red lightning, fantasy concept art, highly detailed.`
     """
 
     messages = [{"role": "system", "content": system_instruction}]
@@ -180,10 +181,10 @@ def generate_image_from_prompt(prompt: str) -> str:
     import random
     seed = random.randint(1, 1000000)
     
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true&seed={seed}"
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}&model=flux"
     
     try:
-        response = requests.get(image_url, timeout=30)
+        response = requests.get(image_url, timeout=45)
         if response.status_code == 200:
             image_bytes = response.content
             base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
@@ -191,4 +192,15 @@ def generate_image_from_prompt(prompt: str) -> str:
         else:
             raise Exception(f"Pollinations API returned status {response.status_code}")
     except Exception as e:
-        raise Exception(f"Image generation failed: {str(e)}")
+        # Fallback to the default (faster) model if flux times out or fails
+        fallback_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+        try:
+            fallback_response = requests.get(fallback_url, timeout=30)
+            if fallback_response.status_code == 200:
+                image_bytes = fallback_response.content
+                base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+                return f"data:image/jpeg;base64,{base64_encoded}"
+            else:
+                raise Exception(f"Fallback API returned status {fallback_response.status_code}")
+        except Exception as fallback_e:
+            raise Exception(f"Image generation failed after fallback: {str(fallback_e)}")

@@ -32,7 +32,7 @@ export interface Project {
   id: string;
   userEmail?: string;
   spark: string;
-  genre?: string;
+  genre: string | null;
   lore: WorldLore | null;
   chatHistory: ChatMessage[];
   storyContent: string;
@@ -58,8 +58,8 @@ interface AppState {
   projects: Project[];
   currentProjectId: string | null;
   
-  currentView: 'dashboard' | 'workspace';
-  setCurrentView: (view: 'dashboard' | 'workspace') => void;
+  currentView: 'dashboard' | 'workspace' | 'my-worlds';
+  setCurrentView: (view: 'dashboard' | 'workspace' | 'my-worlds') => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   
@@ -99,7 +99,10 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       userEmail: null,
       loginTime: null,
-      login: (email) => set({ userEmail: email, loginTime: Date.now(), currentView: 'dashboard' }),
+      login: (email) => {
+          set({ userEmail: email, loginTime: Date.now(), currentView: 'dashboard' });
+          get().fetchProjects();
+      },
       logout: () => set({ userEmail: null, loginTime: null, projects: [], currentProjectId: null, currentView: 'dashboard' }),
       checkSession: () => {
          const time = get().loginTime;
@@ -218,9 +221,9 @@ export const useAppStore = create<AppState>()(
             
             set({ currentProjectId: projectId });
             set(state => {
-                const newProj = { id: projectId, userEmail: email, spark, genre, lore: null, chatHistory: [], storyContent: '', status: 'generating', isArchived: false };
+                const newProject: Project = { id: projectId, userEmail: email, spark, genre: genre || null, lore: null, chatHistory: [], storyContent: '', status: 'generating' as const, isArchived: false };
                 const newGenerating = [...state.generatingProjects, projectId];
-                return { projects: [...state.projects, newProj], generatingProjects: newGenerating };
+                return { projects: [...state.projects, newProject], generatingProjects: newGenerating };
             });
             
             get().pollProject(projectId);
@@ -262,7 +265,7 @@ export const useAppStore = create<AppState>()(
               set({ isChatLoading: false });
           }
       },
-      
+
       sendChatImage: async (projectId, prompt) => {
           const email = get().userEmail;
           if (!email) return;

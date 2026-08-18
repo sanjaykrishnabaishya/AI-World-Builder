@@ -1,8 +1,10 @@
 import json
 import os
 from typing import Dict, Any
+import threading
 
 DB_FILE = "database.json"
+db_lock = threading.Lock()
 
 def _load_db() -> Dict[str, Any]:
     if not os.path.exists(DB_FILE):
@@ -18,20 +20,24 @@ def _save_db(data: Dict[str, Any]):
         json.dump(data, f, indent=2)
 
 def get_all_projects(email: str) -> list:
-    db = _load_db()
-    return [p for p in db["projects"].values() if p.get("userEmail") == email]
+    with db_lock:
+        db = _load_db()
+        return [p for p in db["projects"].values() if p.get("userEmail") == email]
 
 def get_project(project_id: str) -> Dict[str, Any]:
-    db = _load_db()
-    return db["projects"].get(project_id)
+    with db_lock:
+        db = _load_db()
+        return db["projects"].get(project_id)
 
 def save_project(project: Dict[str, Any]):
-    db = _load_db()
-    db["projects"][project["id"]] = project
-    _save_db(db)
+    with db_lock:
+        db = _load_db()
+        db["projects"][project["id"]] = project
+        _save_db(db)
 
 def delete_project(project_id: str):
-    db = _load_db()
-    if project_id in db["projects"]:
-        del db["projects"][project_id]
-        _save_db(db)
+    with db_lock:
+        db = _load_db()
+        if project_id in db["projects"]:
+            del db["projects"][project_id]
+            _save_db(db)

@@ -286,11 +286,28 @@ def chat_project(project_id: str, input_data: ChatInput, x_user_email: str | Non
     try:
         story_content = proj.get("storyContent", "")
         reply = chat_with_world(input_data.message, lore_obj, proj["chatHistory"], story_content)
-        proj = database.get_project(project_id) # Refresh
-        proj["chatHistory"].append({"role": "model", "content": reply})
-        database.save_project(proj)
-        return {"reply": reply}
+        
+        # Check if the LLM generated an /imagine command
+        if reply.strip().startswith("/imagine "):
+            prompt = reply.strip().replace("/imagine ", "", 1).strip()
+            # Generate the image
+            image_b64 = generate_image_from_prompt(prompt)
+            proj = database.get_project(project_id) # Refresh
+            proj["chatHistory"].append({
+                "role": "model", 
+                "content": f'Generated image: "{prompt}"',
+                "image_url": image_b64
+            })
+            database.save_project(proj)
+            return {"reply": f'Generated image: "{prompt}"', "image_url": image_b64}
+        else:
+            proj = database.get_project(project_id) # Refresh
+            proj["chatHistory"].append({"role": "model", "content": reply})
+            database.save_project(proj)
+            return {"reply": reply}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/project/{project_id}/chat_image")
@@ -303,7 +320,12 @@ def chat_image_project(project_id: str, input_data: ImageInput, x_user_email: st
     database.save_project(proj)
     
     try:
-        image_b64 = generate_image_from_prompt(input_data.prompt)
+        # Smart Image Prompt: Append world genre and name to make it unique and thematic
+        genre = proj.get("genre", "fantasy")
+        world_name = proj.get("lore", {}).get("world_name", "a fictional world")
+        smart_prompt = f"{input_data.prompt}, from {world_name}, a {genre} world"
+        
+        image_b64 = generate_image_from_prompt(smart_prompt)
         proj = database.get_project(project_id)
         proj["chatHistory"].append({
             "role": "model", 
@@ -313,4 +335,7 @@ def chat_image_project(project_id: str, input_data: ImageInput, x_user_email: st
         database.save_project(proj)
         return {"image_url": image_b64}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
