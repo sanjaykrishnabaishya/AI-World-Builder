@@ -102,7 +102,7 @@ def download_docx(project_id: str, x_user_email: str | None = Header(default=Non
     fd, path = tempfile.mkstemp(suffix=".docx")
     os.close(fd)
     doc.save(path)
-    return FileResponse(path, filename=f"{world_name}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", background=BackgroundTask(os.remove, path))
+    return FileResponse(path, filename="world.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", background=BackgroundTask(os.remove, path))
 
 @app.get("/api/project/{project_id}/download/pdf")
 def download_pdf(project_id: str, x_user_email: str | None = Header(default=None)):
@@ -145,7 +145,7 @@ def download_pdf(project_id: str, x_user_email: str | None = Header(default=None
     fd, path = tempfile.mkstemp(suffix=".pdf")
     os.close(fd)
     pdf.output(path)
-    return FileResponse(path, filename=f"{world_name}.pdf", media_type="application/pdf", background=BackgroundTask(os.remove, path))
+    return FileResponse(path, filename="world.pdf", media_type="application/pdf", background=BackgroundTask(os.remove, path))
 
 def run_generation_pipeline(project_id: str):
     proj = database.get_project(project_id)
