@@ -186,7 +186,7 @@ export default function Home() {
     projects, currentProjectId, createNewProject, loadProject, archiveProject, deleteProject, renameProject,
     fetchProjects, pollProject,
     isLoading, error,
-    isChatLoading,
+    chatLoadingState,
     currentView, setCurrentView, searchQuery, setSearchQuery,
     startWorldGeneration, stopGeneration, sendChatMessage, sendChatImage,
     generatingProjects, notifications, removeNotification,
@@ -223,7 +223,9 @@ export default function Home() {
     }
   }, [fetchProjects, checkSession]);
 
+  const isChatLoading = chatLoadingState[currentProject?.id || ''];
 
+  // Scroll chat to bottom when new messages arrive
   useEffect(() => {
     const activePollingIds = generatingProjects;
     if (activePollingIds.length === 0) return;

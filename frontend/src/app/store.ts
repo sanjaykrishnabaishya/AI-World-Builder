@@ -88,8 +88,8 @@ interface AppState {
 
   isLoading: boolean;
   setIsLoading: (isLoading: boolean) => void;
-  isChatLoading: boolean;
-  setIsChatLoading: (isLoading: boolean) => void;
+  chatLoadingState: Record<string, boolean>;
+  setChatLoading: (projectId: string, isLoading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
 }
@@ -251,7 +251,7 @@ export const useAppStore = create<AppState>()(
       sendChatMessage: async (projectId, message) => {
           const email = get().userEmail;
           if (!email) return;
-          set({ isChatLoading: true });
+          set(state => ({ chatLoadingState: { ...state.chatLoadingState, [projectId]: true } }));
           try {
               await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat`, {
                 method: 'POST',
@@ -262,14 +262,14 @@ export const useAppStore = create<AppState>()(
           } catch (e) {
               console.error(e);
           } finally {
-              set({ isChatLoading: false });
+              set(state => ({ chatLoadingState: { ...state.chatLoadingState, [projectId]: false } }));
           }
       },
 
       sendChatImage: async (projectId, prompt) => {
           const email = get().userEmail;
           if (!email) return;
-          set({ isChatLoading: true });
+          set(state => ({ chatLoadingState: { ...state.chatLoadingState, [projectId]: true } }));
           try {
               await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat_image`, {
                 method: 'POST',
@@ -280,7 +280,7 @@ export const useAppStore = create<AppState>()(
           } catch (e) {
               console.error(e);
           } finally {
-              set({ isChatLoading: false });
+              set(state => ({ chatLoadingState: { ...state.chatLoadingState, [projectId]: false } }));
           }
       },
 
@@ -331,8 +331,8 @@ export const useAppStore = create<AppState>()(
 
       isLoading: false,
       setIsLoading: (isLoading) => set({ isLoading }),
-      isChatLoading: false,
-      setIsChatLoading: (isChatLoading) => set({ isChatLoading }),
+      chatLoadingState: {},
+      setChatLoading: (projectId, isLoading) => set(state => ({ chatLoadingState: { ...state.chatLoadingState, [projectId]: isLoading } })),
       error: null,
       setError: (error) => set({ error }),
     }),
