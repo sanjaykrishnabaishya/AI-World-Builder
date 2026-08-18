@@ -1,251 +1,344 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-declare global {
-  interface Window {
-    puter: any;
-  }
+export interface Faction {
+  name: string;
+  description: string;
+  motto: string;
+  leader: string;
 }
 
+export interface POI {
+  name: string;
+  description: string;
+  danger_level: string;
+}
 
-export interface Faction { name: string; description: string; motto: string; leader: string; }
-export interface POI { name: string; description: string; danger_level: string; }
-export interface WorldLore { world_name: string; core_history: string; magic_system: string; factions: Faction[]; points_of_interest: POI[]; }
-export interface ChatMessage { role: 'user' | 'model'; content: string; image_url?: string; }
+export interface WorldLore {
+  world_name: string;
+  core_history: string;
+  magic_system: string;
+  factions: Faction[];
+  points_of_interest: POI[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  content: string;
+  image_url?: string;
+}
 
 export interface Project {
-  id: string; userEmail?: string; spark: string; genre: string | null; lore: WorldLore | null;
-  chatHistory: ChatMessage[]; storyContent: string; customName?: string; isArchived?: boolean;
-  status?: 'generating' | 'done' | 'error' | 'stopped'; error?: string;
+  id: string;
+  userEmail?: string;
+  spark: string;
+  genre: string | null;
+  lore: WorldLore | null;
+  chatHistory: ChatMessage[];
+  storyContent: string;
+  customName?: string;
+  isArchived?: boolean;
+  status?: 'generating' | 'done' | 'error' | 'stopped';
+  error?: string;
 }
 
-export interface Notification { id: string; projectId: string; message: string; }
+export interface Notification {
+  id: string;
+  projectId: string;
+  message: string;
+}
 
 interface AppState {
-  userEmail: string | null; loginTime: number | null; login: (email: string) => void; logout: () => void; checkSession: () => boolean;
-  projects: Project[]; currentProjectId: string | null;
-  currentView: 'dashboard' | 'workspace' | 'my-worlds'; setCurrentView: (view: 'dashboard' | 'workspace' | 'my-worlds') => void;
-  searchQuery: string; setSearchQuery: (query: string) => void;
-  generatingProjects: string[]; notifications: Notification[]; addNotification: (projectId: string, message: string) => void; removeNotification: (id: string) => void;
-  selectedGenre: string | null; setSelectedGenre: (genre: string | null) => void;
-  createNewProject: (genre?: string | null) => void; loadProject: (id: string) => void;
-  fetchProjects: () => Promise<void>; pollProject: (id: string) => Promise<Project | null>;
-  startWorldGeneration: (spark: string, genre: string | null) => Promise<void>; stopGeneration: (projectId: string) => Promise<void>;
-  sendChatMessage: (projectId: string, message: string) => Promise<void>; sendChatImage: (projectId: string, prompt: string) => Promise<void>;
-  archiveProject: (id: string) => Promise<void>; deleteProject: (id: string) => Promise<void>; renameProject: (id: string, newName: string) => Promise<void>;
-  isLoading: boolean; setIsLoading: (isLoading: boolean) => void; isChatLoading: boolean; setIsChatLoading: (isLoading: boolean) => void;
-  error: string | null; setError: (error: string | null) => void;
-}
+  userEmail: string | null;
+  loginTime: number | null;
+  login: (email: string) => void;
+  logout: () => void;
+  checkSession: () => boolean;
 
-const saveProjectsToPuter = async (email: string, projects: Project[]) => {
-  if (typeof window !== 'undefined' && window.puter) {
-    await window.puter.kv.set('projects_' + email, projects);
-  }
-};
+  projects: Project[];
+  currentProjectId: string | null;
+  
+  currentView: 'dashboard' | 'workspace' | 'my-worlds';
+  setCurrentView: (view: 'dashboard' | 'workspace' | 'my-worlds') => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  
+  generatingProjects: string[];
+  notifications: Notification[];
+  addNotification: (projectId: string, message: string) => void;
+  removeNotification: (id: string) => void;
+  selectedGenre: string | null;
+  setSelectedGenre: (genre: string | null) => void;
+  
+  // UI Actions
+  createNewProject: (genre?: string | null) => void;
+  loadProject: (id: string) => void;
+  
+  // Engine Actions
+  fetchProjects: () => Promise<void>;
+  pollProject: (id: string) => Promise<Project | null>;
+  startWorldGeneration: (spark: string, genre: string | null) => Promise<void>;
+  stopGeneration: (projectId: string) => Promise<void>;
+  sendChatMessage: (projectId: string, message: string) => Promise<void>;
+  sendChatImage: (projectId: string, prompt: string) => Promise<void>;
+  
+  archiveProject: (id: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  renameProject: (id: string, newName: string) => Promise<void>;
+
+  isLoading: boolean;
+  setIsLoading: (isLoading: boolean) => void;
+  isChatLoading: boolean;
+  setIsChatLoading: (isLoading: boolean) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
+}
 
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      userEmail: null, loginTime: null,
-      login: (email) => { set({ userEmail: email, loginTime: Date.now(), currentView: 'dashboard' }); get().fetchProjects(); },
+      userEmail: null,
+      loginTime: null,
+      login: (email) => {
+          set({ userEmail: email, loginTime: Date.now(), currentView: 'dashboard' });
+          get().fetchProjects();
+      },
       logout: () => set({ userEmail: null, loginTime: null, projects: [], currentProjectId: null, currentView: 'dashboard' }),
       checkSession: () => {
          const time = get().loginTime;
-         if (time && Date.now() - time > 48 * 60 * 60 * 1000) { get().logout(); return false; }
+         if (time && Date.now() - time > 48 * 60 * 60 * 1000) {
+            get().logout();
+            return false;
+         }
          return !!get().userEmail;
       },
-      projects: [], currentProjectId: null, currentView: 'dashboard',
-      setCurrentView: (view) => set({ currentView: view }), searchQuery: '', setSearchQuery: (query) => set({ searchQuery: query }),
-      generatingProjects: [], notifications: [],
-      addNotification: (projectId, message) => set((state) => ({ notifications: [...state.notifications, { id: Date.now().toString(), projectId, message }] })),
-      removeNotification: (id) => set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) })),
-      selectedGenre: null, setSelectedGenre: (genre) => set({ selectedGenre: genre }),
-      createNewProject: (genre?: string | null) => { set({ currentProjectId: null, selectedGenre: genre !== undefined ? genre : null, currentView: 'workspace' }); },
-      loadProject: (id) => { set({ currentProjectId: id, selectedGenre: null, currentView: 'workspace' }); },
+
+      projects: [],
+      currentProjectId: null,
+      
+      currentView: 'dashboard',
+      setCurrentView: (view) => set({ currentView: view }),
+      searchQuery: '',
+      setSearchQuery: (query) => set({ searchQuery: query }),
+
+      generatingProjects: [],
+      notifications: [],
+      addNotification: (projectId, message) => set((state) => ({ 
+        notifications: [...state.notifications, { id: Date.now().toString(), projectId, message }] 
+      })),
+      removeNotification: (id) => set((state) => ({ 
+        notifications: state.notifications.filter(n => n.id !== id) 
+      })),
+      selectedGenre: null,
+      setSelectedGenre: (genre) => set({ selectedGenre: genre }),
+
+      createNewProject: (genre?: string | null) => {
+        set({
+          currentProjectId: null, // Will be set when generation starts
+          selectedGenre: genre !== undefined ? genre : null,
+          currentView: 'workspace'
+        });
+      },
+
+      loadProject: (id) => {
+        set({
+          currentProjectId: id,
+          selectedGenre: null,
+          currentView: 'workspace'
+        });
+        get().pollProject(id);
+      },
 
       fetchProjects: async () => {
-        const email = get().userEmail; if (!email) return;
+        const email = get().userEmail;
+        if (!email) return;
         try {
-          if (typeof window !== 'undefined' && window.puter) {
-             const data = await window.puter.kv.get('projects_' + email);
-             if (data) set({ projects: data });
-          }
-        } catch (e) { console.error("Failed to fetch projects", e); }
-      },
-      pollProject: async (id) => { return null; },
-
-      startWorldGeneration: async (spark, genre) => {
-        const email = get().userEmail; if (!email) return;
-        set({ isLoading: true, error: null });
-        
-        const projectId = Date.now().toString() + Math.random().toString(36).substring(7);
-        set({ currentProjectId: projectId });
-        
-        const newProject: Project = { id: projectId, userEmail: email, spark, genre: genre || null, lore: null, chatHistory: [{role: 'model', content: 'Welcome to Atlas Studio. I am the Story Weaver. What world shall we weave today?'}], storyContent: '', status: 'generating', isArchived: false };
-        set(state => {
-           const newProjects = [...state.projects, newProject];
-           saveProjectsToPuter(email, newProjects);
-           return { projects: newProjects, generatingProjects: [...state.generatingProjects, projectId] };
-        });
-
-        try {
-           const genrePrompt = genre ? "CRITICAL GENRE ENFORCEMENT: Perfect alignment with '" + genre + "'." : "";
-           const lorePrompt = "You are the Master Loremaster. Expand this spark into rich world lore:\nSpark: " + spark + "\n" + genrePrompt + "\nCRITICAL: Return ONLY valid JSON exactly matching: {\"world_name\": \"string\", \"core_history\": \"string\", \"magic_system\": \"string\", \"factions\": [{\"name\": \"string\", \"description\": \"string\", \"motto\": \"string\", \"leader\": \"string\"}], \"points_of_interest\": [{\"name\": \"string\", \"description\": \"string\", \"danger_level\": \"string\"}]}";
-           
-           if (!window.puter) throw new Error("Puter.js not loaded. Refresh the page.");
-           
-           const loreResponse = await window.puter.ai.chat(lorePrompt, { model: 'gemini-1.5-pro' });
-           let loreText = typeof loreResponse === 'string' ? loreResponse : loreResponse.message.content;
-           if (loreText.startsWith("```json")) loreText = loreText.replace(/```json/g, "").replace(/```/g, "");
-           if (loreText.startsWith("```")) loreText = loreText.replace(/```/g, "");
-           
-           const parsedLore = JSON.parse(loreText.trim());
-           
-           set(state => {
-              const p = [...state.projects];
-              const idx = p.findIndex(x => x.id === projectId);
-              if (idx >= 0) { p[idx].lore = parsedLore; saveProjectsToPuter(email, p); }
-              return { projects: p };
-           });
-           
-           const storyPrompt = "You are a bestselling author. Write an immersive opening chapter (2000 words) based on this world:\nWorld Name: " + parsedLore.world_name + "\nHistory: " + parsedLore.core_history + "\nMagic: " + parsedLore.magic_system + "\nCRITICAL: Start immediately. End on a massive cliffhanger. At the very end add: 'For what is going to happen next, Type next part...'";
-           
-           const stream = await window.puter.ai.chat(storyPrompt, { model: 'gemini-1.5-pro', stream: true });
-           let fullStory = '';
-           
-           for await (const chunk of stream) {
-              const textChunk = chunk?.text || "";
-              fullStory += textChunk;
-              set(state => {
-                 const p = [...state.projects];
-                 const idx = p.findIndex(x => x.id === projectId);
-                 if (idx >= 0 && p[idx].status !== ('abort' as any)) {
-                    p[idx].storyContent = fullStory;
-                    if (fullStory.length % 50 === 0) saveProjectsToPuter(email, p);
-                 }
-                 return { projects: p };
-              });
-           }
-           
-           set(state => {
-              const p = [...state.projects];
-              const idx = p.findIndex(x => x.id === projectId);
-              if (idx >= 0) { 
-                 p[idx].status = 'done'; 
-                 saveProjectsToPuter(email, p);
-              }
-              get().addNotification(projectId, "World generation completed!");
-              return { projects: p, generatingProjects: state.generatingProjects.filter(id => id !== projectId), isLoading: false };
-           });
-           
-        } catch (e: any) {
-           console.error(e);
-           set(state => {
-              const p = [...state.projects];
-              const idx = p.findIndex(x => x.id === projectId);
-              if (idx >= 0) { p[idx].status = 'error'; p[idx].error = e.message; saveProjectsToPuter(email, p); }
-              return { projects: p, isLoading: false, generatingProjects: state.generatingProjects.filter(id => id !== projectId) };
-           });
+            const res = await fetch('https://ai-world-builder-backend.onrender.com/api/projects', {
+              headers: { 'X-User-Email': email || '' }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              set({ projects: data.projects });
+              // Re-hydrate generating projects
+              const generating = data.projects.filter((p: Project) => p.status === 'generating').map((p: Project) => p.id);
+              set({ generatingProjects: generating });
+            }
+        } catch (e) {
+            console.error("Failed to fetch projects");
         }
       },
 
-      stopGeneration: async (projectId) => {
-         const email = get().userEmail; if (!email) return;
-         set(state => {
-            const p = [...state.projects];
-            const idx = p.findIndex(x => x.id === projectId);
-            if (idx >= 0) { p[idx].status = 'abort' as any; saveProjectsToPuter(email, p); }
-            return { projects: p };
-         });
+      pollProject: async (id) => {
+        const email = get().userEmail;
+        if (!email) return null;
+        try {
+            const res = await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}`, {
+              headers: { 'X-User-Email': email || '' }
+            });
+            if (res.ok) {
+              const project = await res.json();
+              set(state => {
+                  const idx = state.projects.findIndex(p => p.id === id);
+                  const newProjects = [...state.projects];
+                  if (idx >= 0) newProjects[idx] = project;
+                  else newProjects.push(project);
+                  
+                  // Handle completion notification if we transitioned from generating -> done
+                  let newGenerating = [...state.generatingProjects];
+                  if (state.generatingProjects.includes(id) && project.status !== 'generating') {
+                      newGenerating = newGenerating.filter(gid => gid !== id);
+                      if (project.status === 'done' && state.currentProjectId !== id) {
+                          get().addNotification(id, "World generation completed!");
+                      }
+                  } else if (project.status === 'generating' && !state.generatingProjects.includes(id)) {
+                      newGenerating.push(id);
+                  }
+                  
+                  return { projects: newProjects, generatingProjects: newGenerating, isLoading: false };
+              });
+              return project;
+            }
+        } catch (e) {
+            console.error("Poll failed", e);
+        }
+        return null;
       },
 
+      startWorldGeneration: async (spark, genre) => {
+        const email = get().userEmail;
+        if (!email) return;
+        set({ isLoading: true, error: null });
+        try {
+            // 1. Start project
+            const res = await fetch('https://ai-world-builder-backend.onrender.com/api/project/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
+              body: JSON.stringify({ spark, genre })
+            });
+            if (!res.ok) throw new Error("Failed to create project");
+            const data = await res.json();
+            const projectId = data.project_id;
+            
+            set({ currentProjectId: projectId });
+            set(state => {
+                const newProject: Project = { id: projectId, userEmail: email, spark, genre: genre || null, lore: null, chatHistory: [], storyContent: '', status: 'generating' as const, isArchived: false };
+                const newGenerating = [...state.generatingProjects, projectId];
+                return { projects: [...state.projects, newProject], generatingProjects: newGenerating };
+            });
+            
+            get().pollProject(projectId);
+            
+        } catch (e: any) {
+            console.error(e);
+            set({ error: e.message, isLoading: false });
+        }
+      },
+
+      stopGeneration: async (projectId: string) => {
+          const email = get().userEmail;
+          if (!email) return;
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/stop`, { 
+                method: 'POST',
+                headers: { 'X-User-Email': email || '' }
+              });
+              await get().pollProject(projectId);
+          } catch (e) {
+              console.error(e);
+          }
+      },
+      
       sendChatMessage: async (projectId, message) => {
-         const email = get().userEmail; if (!email) return;
-         set({ isChatLoading: true });
-         
-         set(state => {
-             const p = [...state.projects];
-             const idx = p.findIndex(x => x.id === projectId);
-             if (idx >= 0) {
-                 p[idx].chatHistory.push({ role: 'user', content: message });
-                 saveProjectsToPuter(email, p);
-             }
-             return { projects: p };
-         });
-         
-         try {
-             if (!window.puter) throw new Error("Puter not loaded");
-             const proj = get().projects.find(p => p.id === projectId);
-             const history = proj?.chatHistory.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content })) || [];
-             history.unshift({ role: 'system', content: 'You are the Master Weaver. Answer questions about the world lore.' });
-             
-             const response = await window.puter.ai.chat(history as any, { model: 'gemini-1.5-pro' });
-             const reply = typeof response === 'string' ? response : response.message.content;
-             
-             set(state => {
-                 const p = [...state.projects];
-                 const idx = p.findIndex(x => x.id === projectId);
-                 if (idx >= 0) {
-                     p[idx].chatHistory.push({ role: 'model', content: reply });
-                     saveProjectsToPuter(email, p);
-                 }
-                 return { projects: p, isChatLoading: false };
-             });
-         } catch(e) {
-             console.error(e);
-             set({ isChatLoading: false });
-         }
+          const email = get().userEmail;
+          if (!email) return;
+          set({ isChatLoading: true });
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
+                body: JSON.stringify({ message })
+              });
+              await get().pollProject(projectId);
+          } catch (e) {
+              console.error(e);
+          } finally {
+              set({ isChatLoading: false });
+          }
       },
 
       sendChatImage: async (projectId, prompt) => {
-         const email = get().userEmail; if (!email) return;
-         set({ isChatLoading: true });
-         try {
-             const encoded = encodeURIComponent(prompt);
-             const url = 'https://image.pollinations.ai/prompt/' + encoded + '?width=1024&height=1024&nologo=true';
-             set(state => {
-                 const p = [...state.projects];
-                 const idx = p.findIndex(x => x.id === projectId);
-                 if (idx >= 0) {
-                     p[idx].chatHistory.push({ role: 'model', content: 'Here is a glimpse of that vision...', image_url: url });
-                     saveProjectsToPuter(email, p);
-                 }
-                 return { projects: p, isChatLoading: false };
-             });
-         } catch(e) { console.error(e); set({ isChatLoading: false }); }
+          const email = get().userEmail;
+          if (!email) return;
+          set({ isChatLoading: true });
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat_image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
+                body: JSON.stringify({ prompt })
+              });
+              await get().pollProject(projectId);
+          } catch (e) {
+              console.error(e);
+          } finally {
+              set({ isChatLoading: false });
+          }
       },
 
       archiveProject: async (id) => {
-         const email = get().userEmail; if (!email) return;
-         set(state => {
-             const p = [...state.projects];
-             const idx = p.findIndex(x => x.id === id);
-             if (idx >= 0) { p[idx].isArchived = true; saveProjectsToPuter(email, p); }
-             return { projects: p, currentView: 'dashboard' };
-         });
-      },
-      deleteProject: async (id) => {
-         const email = get().userEmail; if (!email) return;
-         set(state => {
-             const p = state.projects.filter(x => x.id !== id);
-             saveProjectsToPuter(email, p);
-             return { projects: p, currentView: 'dashboard' };
-         });
-      },
-      renameProject: async (id, newName) => {
-         const email = get().userEmail; if (!email) return;
-         set(state => {
-             const p = [...state.projects];
-             const idx = p.findIndex(x => x.id === id);
-             if (idx >= 0) { p[idx].customName = newName; saveProjectsToPuter(email, p); }
-             return { projects: p };
-         });
+          const email = get().userEmail;
+          if (!email) return;
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}/archive`, { 
+                method: 'POST',
+                headers: { 'X-User-Email': email || '' }
+              });
+              await get().fetchProjects();
+              if (get().currentProjectId === id) get().createNewProject();
+          } catch (e) {
+              console.error(e);
+          }
       },
 
-      isLoading: false, setIsLoading: (l) => set({ isLoading: l }),
-      isChatLoading: false, setIsChatLoading: (l) => set({ isChatLoading: l }),
-      error: null, setError: (e) => set({ error: e })
+      deleteProject: async (id) => {
+          const email = get().userEmail;
+          if (!email) return;
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}`, { 
+                method: 'DELETE',
+                headers: { 'X-User-Email': email || '' }
+              });
+              await get().fetchProjects();
+              if (get().currentProjectId === id) get().createNewProject();
+          } catch (e) {
+              console.error(e);
+          }
+      },
+
+      renameProject: async (id, newName) => {
+          const email = get().userEmail;
+          if (!email) return;
+          try {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}/rename`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
+                body: JSON.stringify({ name: newName })
+              });
+              await get().fetchProjects();
+          } catch (e) {
+              console.error(e);
+          }
+      },
+
+      isLoading: false,
+      setIsLoading: (isLoading) => set({ isLoading }),
+      isChatLoading: false,
+      setIsChatLoading: (isChatLoading) => set({ isChatLoading }),
+      error: null,
+      setError: (error) => set({ error }),
     }),
-    { name: 'atlas-studio-storage' }
+    {
+      name: 'atlas-studio-auth',
+      partialize: (state) => ({ userEmail: state.userEmail, loginTime: state.loginTime }),
+    }
   )
 );
