@@ -39,8 +39,9 @@ def generate_world_lore(spark: str, genre: str | None = None) -> WorldLore:
     DO NOT reuse generic plotlines or exact world configurations. Be highly creative and imaginative.
     
     CRITICAL NAMING RULE:
-    KEEP NAMES EXTREMELY SIMPLE AND UNDERSTANDABLE. Do NOT invent weird, hard-to-pronounce, or over-complex alien/fantasy syllables (like "Xyloplic", "Agrathon", "Nexon Lumis").
-    Use simple, descriptive, and common names (e.g., "Earth Kingdom", "Iron Knights", "Healing Magic", "Super Suits", "Fireball"). The world should feel grounded and instantly understandable.
+    KEEP ALL NAMES AND CONCEPTS EXTREMELY SIMPLE AND UNDERSTANDABLE. Use very simple words that a 7-year-old child can easily understand. 
+    Absolutely DO NOT invent weird, hard-to-pronounce, or complex fantasy/sci-fi syllables. 
+    Use basic, descriptive words for everything: "Sun City", "Fire Magic", "Water Clan", "The Dark Forest", "Star Ship". The technology, powers, and locations MUST be incredibly easy to grasp.
     
     Provide the world's name, a detailed core history, an explanation of the magic or technology system, 
     3 major factions, and 3 key points of interest.
