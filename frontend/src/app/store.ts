@@ -153,7 +153,7 @@ export const useAppStore = create<AppState>()(
         const email = get().userEmail;
         if (!email) return;
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/projects', {
+            const res = await fetch('https://ai-world-builder-backend.onrender.com/api/projects', {
               headers: { 'X-User-Email': email || '' }
             });
             if (res.ok) {
@@ -172,7 +172,7 @@ export const useAppStore = create<AppState>()(
         const email = get().userEmail;
         if (!email) return null;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/project/${id}`, {
+            const res = await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}`, {
               headers: { 'X-User-Email': email || '' }
             });
             if (res.ok) {
@@ -210,7 +210,7 @@ export const useAppStore = create<AppState>()(
         set({ isLoading: true, error: null });
         try {
             // 1. Start project
-            const res = await fetch('http://127.0.0.1:8000/api/project/start', {
+            const res = await fetch('https://ai-world-builder-backend.onrender.com/api/project/start', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
               body: JSON.stringify({ spark, genre })
@@ -238,7 +238,7 @@ export const useAppStore = create<AppState>()(
           const email = get().userEmail;
           if (!email) return;
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${projectId}/stop`, { 
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/stop`, { 
                 method: 'POST',
                 headers: { 'X-User-Email': email || '' }
               });
@@ -253,7 +253,7 @@ export const useAppStore = create<AppState>()(
           if (!email) return;
           set({ isChatLoading: true });
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${projectId}/chat`, {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
                 body: JSON.stringify({ message })
@@ -271,7 +271,7 @@ export const useAppStore = create<AppState>()(
           if (!email) return;
           set({ isChatLoading: true });
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${projectId}/chat_image`, {
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${projectId}/chat_image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
                 body: JSON.stringify({ prompt })
@@ -288,7 +288,7 @@ export const useAppStore = create<AppState>()(
           const email = get().userEmail;
           if (!email) return;
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${id}/archive`, { 
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}/archive`, { 
                 method: 'POST',
                 headers: { 'X-User-Email': email || '' }
               });
@@ -303,7 +303,7 @@ export const useAppStore = create<AppState>()(
           const email = get().userEmail;
           if (!email) return;
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${id}`, { 
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}`, { 
                 method: 'DELETE',
                 headers: { 'X-User-Email': email || '' }
               });
@@ -318,7 +318,7 @@ export const useAppStore = create<AppState>()(
           const email = get().userEmail;
           if (!email) return;
           try {
-              await fetch(`http://127.0.0.1:8000/api/project/${id}/rename`, { 
+              await fetch(`https://ai-world-builder-backend.onrender.com/api/project/${id}/rename`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-User-Email': email || '' },
                 body: JSON.stringify({ name: newName })
