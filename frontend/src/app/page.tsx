@@ -209,6 +209,7 @@ export default function Home() {
   const bgRef = useRef<HTMLDivElement>(null);
   const bgScrollRef = useRef<HTMLDivElement>(null);
   const workspaceScrollRef = useRef<HTMLDivElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
 
   // Derive active project
   const currentProject = projects.find(p => p.id === currentProjectId);
@@ -242,6 +243,18 @@ export default function Home() {
         chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatHistory, isChatLoading, storyContent, isUserScrolled]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target as Node)) {
+        setShowDownloadMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [downloadMenuRef]);
 
   const handleWorkspaceScroll = (e: React.UIEvent<HTMLDivElement>) => {
      const container = e.currentTarget;
@@ -690,7 +703,7 @@ export default function Home() {
                         <Copy size={14} /> {copied ? "Copied!" : "Copy Story"}
                       </button>
 
-                      <div style={{ position: 'relative' }}>
+                      <div style={{ position: 'relative' }} ref={downloadMenuRef}>
                          <button className="btn-gold" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', padding: '0.4rem 0.8rem', borderRadius: '8px' }} onClick={() => setShowDownloadMenu(!showDownloadMenu)}>
                             <Download size={14} /> Download {showDownloadMenu ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                          </button>
