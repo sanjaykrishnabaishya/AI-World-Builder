@@ -203,27 +203,46 @@ Open your browser and go to: `http://localhost:3000`
 
 ---
 
-## 🛠️ Bugs Fixed & Improvements History
+## 🛠️ Complete History of Bugs Fixed & Improvements
 
-Here is a simple list of real problems we found during building and how we fixed each one:
+Here is the complete list of every single problem we faced during development, how we fixed it, and the major improvements we made, written in simple everyday words:
 
-| Commit Hash | 🐛 Problem We Found | 🔧 How We Fixed It (Simple Words) |
+### 1. 🐛 Critical Bug Fixes
+| Commit Hash | What Was Broken | How We Fixed It (Simple Words) |
 | :--- | :--- | :--- |
-| **`e884658`** | **AI used words that were too hard**: The AI made up confusing, weird names that were hard to read. | We instructed the AI to always use simple, friendly words that even a 7-year-old child can understand easily. |
-| **`e333ff7`** | **Download popup got stuck on screen**: The download menu wouldn't close after opening. | We added a click detector so tapping anywhere outside automatically closes the menu. |
-| **`2c3e881`** | **Download failed on special titles**: If a world had spaces or symbols in its name, downloading Word/PDF files crashed. | We cleaned up the file names on the server and added safety checks so files always download cleanly. |
-| **`6daa438`** | **Download buttons didn't work online**: The download buttons were looking for files on a personal laptop (`localhost`) instead of the live website. | We updated the links to point to the live cloud server on Render so anyone in the world can download their stories. |
-| **`29f3c7a`** | **Loading spinner showed in the wrong world**: If you switched worlds while one was writing, the "Thinking..." spinner appeared in the wrong project. | We gave each project its own separate loading memory so spinners only show in the active world. |
-| **`233812c`** | **AI extra talk broke the system**: The AI sometimes added conversational talk before the data, making the system crash. | We added a smart filter that grabs only the data inside `{}` brackets and ignores any extra conversation. |
-| **`b55c7f3`** | **Old AI model stopped working during busy times**: The previous free AI proxy kept crashing when traffic spiked. | We switched to **Meta Llama 3.1 70B** through OpenRouter so the app stays fast and never crashes. |
-| **`fe5bade`** | **"Too Many Requests" (Error 429)**: The AI hit rate limits and stopped answering when generating long stories. | We upgraded the model pipeline and removed token waste so requests never get blocked. |
-| **`01ce152`** | **AI got stuck in an endless loop**: An experimental model kept printing endless blank spaces without stopping. | We reverted to a stable model with strict token limits so chapters always stop at the right time. |
-| **`1571a04`** | **Website couldn't talk to the backend (CORS Error)**: The browser blocked the website from talking to the server for security reasons. | We added CORS permissions on the server so the frontend and backend can share data without blocks. |
-| **`20f201c`** | **Cloud deployment crashed**: The cloud server failed to build because it was missing required packages. | We added `python-docx` and `fpdf` into `requirements.txt` so the server installs everything automatically. |
+| **`e884658`** | **AI was using confusing, difficult words**: The AI generated hard-to-pronounce fantasy words and complicated jargon. | We updated the AI instructions to strictly use simple, friendly English that even a 7-year-old child can understand. |
+| **`e333ff7`** | **Download popup stayed stuck on screen**: Clicking outside the download menu didn't close it. | We added an automatic click detector so tapping anywhere outside closes the popup instantly. |
+| **`2c3e881`** | **File download crashed on special titles**: If a world name had symbols, spaces, or emojis, the Word/PDF download failed. | We cleaned up the file names on the server and added safety checks so files always download cleanly. |
+| **`6daa438`** | **Download buttons didn't work on the live site**: The download buttons tried to grab files from a local laptop (`localhost`) instead of the internet. | We updated the links to point directly to the live Render cloud server. |
+| **`29f3c7a`** | **Loading spinner showed in the wrong world**: Switching worlds while one was writing showed the "Writing..." message in the wrong project. | We gave each world its own separate memory so loading messages only appear in the active project. |
+| **`233812c`** | **AI chit-chat crashed the system**: The AI added introductory phrases before the data, breaking the code. | We added a smart boundary filter that searches only for the `{}` data brackets and throws away extra talk. |
+| **`b55c7f3`** | **AI crashed during busy hours**: The previous free AI proxy kept disconnecting under heavy traffic. | We switched the engine to **Meta Llama 3.1 70B** through OpenRouter for rock-solid stability. |
+| **`fe5bade`** | **"Too Many Requests" (Error 429)**: The AI hit rate limits when writing long chapters and stopped responding. | We upgraded the model pipeline and trimmed token waste so requests never get blocked. |
+| **`01ce152`** | **AI got stuck in an infinite blank loop**: An experimental model kept printing endless empty spaces without stopping. | We reverted to a stable model with strict token limits so chapters always stop cleanly at the cliffhanger. |
+| **`cc60aed`** | **Invalid AI Model ID**: The server tried calling a model name that did not exist on the network. | We corrected the model identifier string in the API configuration. |
+| **`1571a04`** | **Website couldn't talk to the server (CORS Error)**: Web browsers blocked the website from talking to the backend for security reasons. | We enabled CORS permissions on the backend so the website and server can communicate without blocks. |
+| **`58f5280`** | **Frontend was calling localhost**: The online website was trying to send messages to a local computer. | We pointed the frontend to the production backend URL on Render. |
+| **`20f201c`** | **Cloud deployment crashed on start**: The cloud server failed to build because required packages were missing. | We added `python-docx` and `fpdf` into `requirements.txt` so the server installs everything automatically. |
+| **`44bda10`** | **Next.js static export build errors**: The frontend failed to build as static HTML for edge hosting. | Configured Next.js with `output: "export"` so the site loads in milliseconds from global CDNs. |
+| **`b537741`** | **TypeScript type errors & UI glitches**: Code had mismatched data types that caused compiler warnings. | Cleaned up all TypeScript interfaces and ensured flawless multi-genre compatibility. |
+
+---
+
+### 2. 🚀 Major Features & Architectural Improvements
+| Commit Hash | What We Improved | Why It Matters (Simple Words) |
+| :--- | :--- | :--- |
+| **`30c37ff`** | **AI Uniqueness & Inspiration Shuffler**: Stories used to start with similar repetitive opening sentences. | Added random uniqueness seeds and a Fisher-Yates card shuffler to guarantee completely original worlds every time. |
+| **`88a109c`** | **Google AI Studio Dark Theme**: The initial interface looked plain and lacked visual polish. | Redesigned the entire UI to a sleek dark aesthetic with firefly particle animations and unified generation controls. |
+| **`c66f5d9`** | **Live Story Streaming & Cliffhangers**: Stories used to take 30 seconds of waiting before appearing all at once. | Built a live word-by-word streaming engine that writes multi-chapter stories in real-time with cliffhangers. |
+| **`b34275f`** | **AI Picture Generator (`/imagine`)**: The app could only generate text, not images. | Integrated the **Flux AI** model so users can type `/imagine` and get instant, high-quality pictures of their world. |
+| **`f072c8a`** | **Interactive Story Weaver Chat**: Users couldn't edit or guide the story after generation. | Added a two-way chat system where you can talk to the Story Weaver to change characters or ask what happens next. |
+| **`1fa9553` & `84779fb`** | **1-Click Free Cloud Deployment**: Setting up servers manually was slow and prone to configuration mistakes. | Created `render.yaml` so anyone can deploy both the frontend and backend with a single click on free cloud tiers. |
+| **`740946e` & `a2c11ef`** | **Pydantic Lore Schemas**: Raw AI text wasn't structured into organized game-ready data. | Built strict data models that automatically separate the output into Factions, Magic Rules, History, and Points of Interest. |
 
 ---
 
 ## 📜 License
 
 This project is licensed under the **MIT License**.
+
 
