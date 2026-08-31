@@ -203,6 +203,27 @@ Open your browser and go to: `http://localhost:3000`
 
 ---
 
+## 🛠️ Bugs Fixed & Improvements History
+
+Here is a simple list of real problems we found during building and how we fixed each one:
+
+| Commit Hash | 🐛 Problem We Found | 🔧 How We Fixed It (Simple Words) |
+| :--- | :--- | :--- |
+| **`e884658`** | **AI used words that were too hard**: The AI made up confusing, weird names that were hard to read. | We instructed the AI to always use simple, friendly words that even a 7-year-old child can understand easily. |
+| **`e333ff7`** | **Download popup got stuck on screen**: The download menu wouldn't close after opening. | We added a click detector so tapping anywhere outside automatically closes the menu. |
+| **`2c3e881`** | **Download failed on special titles**: If a world had spaces or symbols in its name, downloading Word/PDF files crashed. | We cleaned up the file names on the server and added safety checks so files always download cleanly. |
+| **`6daa438`** | **Download buttons didn't work online**: The download buttons were looking for files on a personal laptop (`localhost`) instead of the live website. | We updated the links to point to the live cloud server on Render so anyone in the world can download their stories. |
+| **`29f3c7a`** | **Loading spinner showed in the wrong world**: If you switched worlds while one was writing, the "Thinking..." spinner appeared in the wrong project. | We gave each project its own separate loading memory so spinners only show in the active world. |
+| **`233812c`** | **AI extra talk broke the system**: The AI sometimes added conversational talk before the data, making the system crash. | We added a smart filter that grabs only the data inside `{}` brackets and ignores any extra conversation. |
+| **`b55c7f3`** | **Old AI model stopped working during busy times**: The previous free AI proxy kept crashing when traffic spiked. | We switched to **Meta Llama 3.1 70B** through OpenRouter so the app stays fast and never crashes. |
+| **`fe5bade`** | **"Too Many Requests" (Error 429)**: The AI hit rate limits and stopped answering when generating long stories. | We upgraded the model pipeline and removed token waste so requests never get blocked. |
+| **`01ce152`** | **AI got stuck in an endless loop**: An experimental model kept printing endless blank spaces without stopping. | We reverted to a stable model with strict token limits so chapters always stop at the right time. |
+| **`1571a04`** | **Website couldn't talk to the backend (CORS Error)**: The browser blocked the website from talking to the server for security reasons. | We added CORS permissions on the server so the frontend and backend can share data without blocks. |
+| **`20f201c`** | **Cloud deployment crashed**: The cloud server failed to build because it was missing required packages. | We added `python-docx` and `fpdf` into `requirements.txt` so the server installs everything automatically. |
+
+---
+
 ## 📜 License
 
 This project is licensed under the **MIT License**.
+
